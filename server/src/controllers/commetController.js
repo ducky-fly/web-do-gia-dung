@@ -26,14 +26,39 @@ const getCommentsByProduct = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Kiểm tra ObjectId hợp lệ
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
+    }
+
+    // 1. Lấy tất cả comment theo productId
     const comments = await commentModel
-      .find({ productId: new mongoose.Types.ObjectId(id) })
-      .populate("userId", "username") // chỉ lấy trường username
+      .find({ productId: id })
+      .populate("userId", "username")
       .sort({ createdAt: -1 });
 
-    res.status(200).json(comments);
+    // 2. Lấy sản phẩm và populate ratings
+    const product = await productModel.findById(id).lean(); // lean để dễ xử lý
+
+    // 3. Mapping ratings theo userId
+    const ratingMap = {};
+    if (product && product.ratings) {
+      product.ratings.forEach((r) => {
+        ratingMap[r.userId.toString()] = r.star;
+      });
+    }
+
+    // 4. Gán star vào mỗi comment nếu user đã rating
+    const commentsWithStar = comments.map((cmt) => {
+      const cmtObj = cmt.toObject(); // convert document -> object
+      const userId = cmt.userId?._id?.toString();
+      cmtObj.star = ratingMap[userId] || 0;
+      return cmtObj;
+    });
+
+    res.status(200).json(commentsWithStar);
   } catch (err) {
-    console.error(err);
+    console.error("🔥 Lỗi khi lấy bình luận:", err);
     res.status(500).json({ error: "Không thể lấy bình luận." });
   }
 });
