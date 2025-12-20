@@ -139,6 +139,7 @@ const login = asyncHandler(async (req, res) => {
       username: user.username,
       success: true,
       role: user.role,
+      refreshToken: refreshToken,
     });
   } else {
     res.status(401);
